@@ -15,10 +15,13 @@ namespace DiceGame
         string diceRollString;
         int width = 75;
         int height = 25;
-        int maxScore = 200;
+        int maxScore = 400;
         int rowTwoStart = 16;
         int cursorX;
         int cursorY;
+        int progressBarLength = 50;
+        int progressBarStart = 17;
+        int progressBarEnd = 67;
         bool isStarted = false;
 
         public GameController()
@@ -37,7 +40,6 @@ namespace DiceGame
             bool gameOn = true;
             while (gameOn)
             {
-                DisplayScreen();
                 foreach (Player player in playerList)
                 {
                     bool won = StartTurn(player);
@@ -52,12 +54,31 @@ namespace DiceGame
         }
         public bool StartTurn(Player player)
         {
+            PromptRoll(player);
             diceRollList = player.RollDice(dice);
             CreateDiceRollString();
-            AddScore();
-            DisplayScore();
-            Console.Read();
+            AddScore(player);
+            DisplayScreen();
+            cursorX = 4;
+            cursorY = 19;
+            SetCursor();
+            Console.ReadLine();
             return (player.score >= maxScore);
+        }
+        public void AddScore(Player player)
+        {
+            foreach (int number in diceRollList)
+            {
+                player.score += number;
+            }
+        }
+        public void CreateDiceRollString()
+        {
+            diceRollString = "";
+            for (int i = 0; i < diceRollList.Count; i++)
+            {
+                diceRollString += diceArray[i] + ": " + diceRollList[i] + "   ";
+            }
         }
         public bool GetExit()
         {
@@ -75,8 +96,18 @@ namespace DiceGame
             }
             return false;
         }
+        public void PromptRoll(Player player)
+        {
+            diceRollList.Clear();
+            diceRollString = player.name + "'s turn. Roll the dice!";
+            cursorX = 4;
+            cursorY = 19;
+            SetCursor();
+            DisplayScreen();
+            Console.Read();
+        }
         //Display Functions-------------------------------
-        public void DisplayScore()
+        public void DrawScore()
         {
             for (int i = 0; i < playerList.Count; i++)
             {
@@ -84,17 +115,25 @@ namespace DiceGame
                 cursorY = 4 + (i * 2);
                 SetCursor();
                 Write(playerList[i].name + ": " + playerList[i].score);
+                BuildProgressBar(i);
 
             }
         }
-        public void CreateDiceRollString()
+        public void BuildProgressBar(int playerIndex)
         {
-            diceRollString = "";
-            for (int i = 0; i < diceRollList.Count; i++)
+            cursorX = progressBarStart;
+            SetCursor();
+            Write("[");
+            for (int i = 0; i < maxScore; i += maxScore/progressBarLength)
             {
-                diceRollString += diceArray[i] + ": " + diceRollList[i] + "   ";
+                if (playerList[playerIndex].score > i)
+                {
+                    Write("|");
+                }
             }
-            DisplayScreen();
+            cursorX = progressBarEnd;
+            SetCursor();
+            Write("]");
         }
         public void ShowWinner(Player player)
         {
@@ -108,6 +147,7 @@ namespace DiceGame
             if (isStarted)
             {
                 DrawDiceRoll();
+                DrawScore();
             }
             else
             {
@@ -177,7 +217,7 @@ namespace DiceGame
         public void CreateAIPlayers(int numberOfAI)
         {
             int numberOfHumans = playerList.Count;
-            for (int i = numberOfHumans - 1; i < numberOfAI + numberOfHumans; i++)
+            for (int i = numberOfHumans; i < numberOfAI + numberOfHumans; i++)
             {
                 playerList.Add(new AI(i + 1));
             }
