@@ -11,12 +11,14 @@ namespace DiceGame
         static void Main(string[] args)
         {
             bool exit = false;
+            GameController gamecontroller;
             while (!exit)
             {
-                GameController gamecontroller = new GameController();
+                gamecontroller = new GameController();
                 exit = gamecontroller.Begin();
+                Console.Write("");
+                gamecontroller = null;
             }
-            
         }
     }
 }

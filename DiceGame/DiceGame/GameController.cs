@@ -10,19 +10,34 @@ namespace DiceGame
     {
         Dice dice = new Dice();
         List<Player> playerList = new List<Player>();
+        List<Player> playersLeft = new List<Player>();
         List<int> diceRollList = new List<int>();
         string[] diceArray = new string[6] { "D4", "D6", "D8", "D10", "D12", "D20" };
         string diceRollString;
+        bool continueTurn;
         int width = 75;
         int height = 25;
-        int maxScore = 400;
+        int maxScore = 250;
         int rowTwoStart = 16;
         int cursorX;
         int cursorY;
         int progressBarLength = 50;
-        int progressBarStart = 17;
-        int progressBarEnd = 67;
+        int progressBarStart = 18;
+        int progressBarEnd = 68;
         bool isStarted = false;
+        bool gameOn = true;
+        bool turnDone = false;
+        Player currentPlayer;
+        Player winningPlayer;
+        Random random = new Random();
+        public List<int> D4KillList = new List<int>();
+        public List<int> D6KillList = new List<int>();
+        public List<int> D8KillList = new List<int>();
+        public List<int> D10KillList = new List<int>();
+        public List<int> D12KillList = new List<int>();
+        public List<int> D20KillList = new List<int>();
+        public List<List<int>> killList;
+
 
         public GameController()
         {
@@ -30,46 +45,125 @@ namespace DiceGame
         }
         public bool Begin()
         {
+            killList = new List<List<int>>() { D4KillList, D6KillList, D8KillList, D10KillList, D12KillList, D20KillList };
             FormatScreen();
             DisplayScreen();
-            int numberOfHumanPlayers = GetNumberOfHumanPlayers();
-            CreateHumanPlayers(numberOfHumanPlayers);
-            int numberOfAIPlayers = GetNumberOfAIPlayers();
-            CreateAIPlayers(numberOfAIPlayers);
+            CreateHumanPlayers(GetNumberOfHumanPlayers());
+            CreateAIPlayers(GetNumberOfAIPlayers());
+            CreatePlayersLeft();
             isStarted = true;
-            bool gameOn = true;
             while (gameOn)
             {
-                foreach (Player player in playerList)
+                GetCurrentPlayer();
+                if (gameOn)
                 {
-                    bool won = StartTurn(player);
-                    if (won)
+                    bool playerDone = false;
+                    while (!playerDone)
                     {
-                        ShowWinner(player);
-                        gameOn = false;
+                        playerDone = StartTurn();
+                        currentPlayer.turn++;
+                    }
+                    playersLeft.Remove(currentPlayer);
+                    ClearKillList();
+                    playerDone = false;
+                }
+            }
+            return GetExit();
+        }
+        public void ClearKillList()
+        {
+            D4KillList.Clear();
+            D6KillList.Clear();
+            D8KillList.Clear();
+            D10KillList.Clear();
+            D12KillList.Clear();
+            D20KillList.Clear();
+        }
+        public void CreatePlayersLeft()
+        {
+            foreach (Player player in playerList)
+            {
+                playersLeft.Add(player);
+            }
+        }
+        public void GetCurrentPlayer()
+        {
+            if (playersLeft.Count == 0)
+            {
+                FindWinner();
+                ShowWinner();
+            }
+            else
+            {
+            currentPlayer = playersLeft[random.Next(0, playersLeft.Count - 1)];
+            }
+        }
+        public bool StartTurn()
+        {
+            PromptRoll();
+            if (turnDone)
+            {
+                turnDone = false;
+                return true;
+            }
+            else
+            {
+                diceRollList = currentPlayer.RollDice(dice);
+                bool continueTurn = CompareToKillList();
+                killList = currentPlayer.BuildKillList();
+                if (!continueTurn)
+                {
+                    DisplayTurnOverScreen();
+                    return true;
+                }
+                else
+                {
+                    CreateDiceRollString();
+                    AddScore();
+                    DisplayScreen();
+                    cursorX = 4;
+                    cursorY = 19;
+                    SetCursor();
+                    Console.ReadLine();
+                }
+            }
+            return (currentPlayer.score <= 0);
+        }
+        public void FindWinner()
+        {
+            int highScore = 501;
+            foreach (Player player in playerList)
+            {
+                if (player.score < highScore)
+                {
+                    highScore = player.score;
+                    winningPlayer = player;
+                }
+            }
+        }
+        public bool CompareToKillList()
+        {
+            for (int i = 0; i < killList.Count; i++)
+            {
+                foreach (int roll in killList[i])
+                {
+                    if (roll == diceRollList[i])
+                    {
+                        return false;
                     }
                 }
             }
-           return GetExit();
+            return true;
         }
-        public bool StartTurn(Player player)
-        {
-            PromptRoll(player);
-            diceRollList = player.RollDice(dice);
-            CreateDiceRollString();
-            AddScore(player);
-            DisplayScreen();
-            cursorX = 4;
-            cursorY = 19;
-            SetCursor();
-            Console.ReadLine();
-            return (player.score >= maxScore);
-        }
-        public void AddScore(Player player)
+        public void AddScore()
         {
             foreach (int number in diceRollList)
             {
-                player.score += number;
+                currentPlayer.score -= number;
+                if (currentPlayer.score < 0)
+                {
+                    currentPlayer.score = 0;
+                }
             }
         }
         public void CreateDiceRollString()
@@ -85,7 +179,9 @@ namespace DiceGame
             bool exit = false;
             while (!exit)
             {
-                switch (GetInput())
+                Clear();
+                WriteLine("Exit? (yes/no)");
+                switch (Console.ReadLine())
                 {
                     case "yes":
                         return true;
@@ -96,17 +192,40 @@ namespace DiceGame
             }
             return false;
         }
-        public void PromptRoll(Player player)
+        public void PromptRoll()
         {
             diceRollList.Clear();
-            diceRollString = player.name + "'s turn. Roll the dice!";
-            cursorX = 4;
-            cursorY = 19;
-            SetCursor();
+            diceRollString = currentPlayer.name + ", type 'roll' to roll the dice \n*   or type 'done' to finish your turn.";
             DisplayScreen();
-            Console.Read();
+            cursorX = 4;
+            cursorY = 20;
+            SetCursor();
+            if (CheckPromptRoll())
+            {
+                turnDone = true;
+                DisplayTurnOverScreen();
+            }
+        }
+        public bool CheckPromptRoll()
+        {
+            string input = Console.ReadLine().ToLower();
+            if ( input== "done")
+            {
+                return true;
+            }
+            return false;
         }
         //Display Functions-------------------------------
+        public void DisplayTurnOverScreen()
+        {
+            diceRollList.Clear();
+            diceRollString = currentPlayer.name + ", your turn is over!\n*    You got a score of " + currentPlayer.score;
+            DisplayScreen();
+            cursorX = 4;
+            cursorY = 20;
+            SetCursor();
+            Console.ReadLine();
+        }
         public void DrawScore()
         {
             for (int i = 0; i < playerList.Count; i++)
@@ -135,9 +254,17 @@ namespace DiceGame
             SetCursor();
             Write("]");
         }
-        public void ShowWinner(Player player)
+        public void ShowWinner()
         {
-
+            Clear();
+            FormatScreen();
+            DrawBorder();
+            cursorX = 4;
+            cursorY = 4;
+            SetCursor();
+            Write(winningPlayer.name + " is the winner!");
+            Console.ReadLine();
+            gameOn = false;
         }
         public void DisplayScreen()
         {
@@ -210,7 +337,7 @@ namespace DiceGame
         {
             for (int i = 0; i < numberOfPlayers; i++)
             {
-                Player player = new Human(i + 1);
+                Player player = new Human(i + 1, maxScore);
                 playerList.Add(player);
             }
         }
@@ -219,7 +346,7 @@ namespace DiceGame
             int numberOfHumans = playerList.Count;
             for (int i = numberOfHumans; i < numberOfAI + numberOfHumans; i++)
             {
-                playerList.Add(new AI(i + 1));
+                playerList.Add(new AI(i + 1, maxScore));
             }
         }
         public int GetNumberOfAIPlayers()
@@ -274,7 +401,7 @@ namespace DiceGame
         public string GetInput()
         {
             DisplayScreen();
-            Console.SetCursorPosition(4, 4);
+            Console.SetCursorPosition(cursorX, cursorY);
             return Console.ReadLine();
         }
         public void Clear()

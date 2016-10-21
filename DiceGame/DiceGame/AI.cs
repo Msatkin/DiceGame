@@ -8,9 +8,10 @@ namespace DiceGame
 {
     class AI : Player
     {
-        public AI(int place)
+        public AI(int place, int score)
         {
             this.name = "Player " + place;
+            this.score = score;
         }
     }
 }

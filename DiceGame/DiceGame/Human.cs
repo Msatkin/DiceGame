@@ -8,9 +8,10 @@ namespace DiceGame
 {
     class Human : Player
     {
-        public Human(int place)
+        public Human(int place, int score)
         {
-            this.name = "Player " + place; 
+            this.name = "Player " + place;
+            this.score = score;
         }
     }
 }
