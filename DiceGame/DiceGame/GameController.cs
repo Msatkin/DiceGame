@@ -14,7 +14,7 @@ namespace DiceGame
         List<int> diceRollList = new List<int>();
         string[] diceArray = new string[6] { "D4", "D6", "D8", "D10", "D12", "D20" };
         string diceRollString;
-        bool continueTurn;
+        int allTimeHighScore;
         int width = 75;
         int height = 25;
         int maxScore = 250;
@@ -22,13 +22,16 @@ namespace DiceGame
         int cursorX;
         int cursorY;
         int progressBarLength = 50;
-        int progressBarStart = 18;
-        int progressBarEnd = 68;
+        int progressBarStart = 21;
+        int progressBarEnd = 71;
+        bool playerDone = false;
         bool isStarted = false;
         bool gameOn = true;
+        bool playerTurnDone = false;
         bool turnDone = false;
         Player currentPlayer;
         Player winningPlayer;
+        FileEditor editFile = new FileEditor();
         Random random = new Random();
         public List<int> D4KillList = new List<int>();
         public List<int> D6KillList = new List<int>();
@@ -38,14 +41,10 @@ namespace DiceGame
         public List<int> D20KillList = new List<int>();
         public List<List<int>> killList;
 
-
-        public GameController()
-        {
-            
-        }
         public bool Begin()
         {
-            killList = new List<List<int>>() { D4KillList, D6KillList, D8KillList, D10KillList, D12KillList, D20KillList };
+            allTimeHighScore = editFile.LoadHighScore();
+            CreateKillList();
             FormatScreen();
             DisplayScreen();
             CreateHumanPlayers(GetNumberOfHumanPlayers());
@@ -54,49 +53,37 @@ namespace DiceGame
             isStarted = true;
             while (gameOn)
             {
-                GetCurrentPlayer();
-                if (gameOn)
-                {
-                    bool playerDone = false;
-                    while (!playerDone)
-                    {
-                        playerDone = StartTurn();
-                        currentPlayer.turn++;
-                    }
-                    playersLeft.Remove(currentPlayer);
-                    ClearKillList();
-                    playerDone = false;
-                }
+                KeepGameRunning();
             }
+            Console.ReadLine();
             return GetExit();
         }
-        public void ClearKillList()
+        public void KeepGameRunning()
         {
-            D4KillList.Clear();
-            D6KillList.Clear();
-            D8KillList.Clear();
-            D10KillList.Clear();
-            D12KillList.Clear();
-            D20KillList.Clear();
-        }
-        public void CreatePlayersLeft()
-        {
-            foreach (Player player in playerList)
+            GetCurrentPlayer();
+            RunCurrentPlayerTurn();
+            if (!playerTurnDone)
             {
-                playersLeft.Add(player);
+                while (!playerDone)
+                {
+                    playerDone = StartTurn();
+                    currentPlayer.turn++;
+                }
+                playersLeft.Remove(currentPlayer);
+                playerDone = false;
             }
         }
-        public void GetCurrentPlayer()
+        public void RunCurrentPlayerTurn()
         {
-            if (playersLeft.Count == 0)
+            while (!playerDone)
             {
-                FindWinner();
-                ShowWinner();
+                playerDone = StartTurn();
+                currentPlayer.turn++;
             }
-            else
-            {
-            currentPlayer = playersLeft[random.Next(0, playersLeft.Count - 1)];
-            }
+            playersLeft.Remove(currentPlayer);
+            playerDone = false;
+            playerTurnDone = true;
+            ClearKillList();
         }
         public bool StartTurn()
         {
@@ -108,36 +95,83 @@ namespace DiceGame
             }
             else
             {
-                diceRollList = currentPlayer.RollDice(dice);
-                bool continueTurn = CompareToKillList();
-                killList = currentPlayer.BuildKillList();
-                if (!continueTurn)
-                {
-                    DisplayTurnOverScreen();
-                    return true;
-                }
-                else
-                {
-                    CreateDiceRollString();
-                    AddScore();
-                    DisplayScreen();
-                    cursorX = 4;
-                    cursorY = 19;
-                    SetCursor();
-                    Console.ReadLine();
-                }
+                return ContinueTurn();
             }
+        }
+        public bool ContinueTurn()
+        {
+            diceRollList = currentPlayer.RollDice(dice);
+            if (!CompareToKillList())
+            {
+                DisplayTurnOverScreen();
+                return true;
+            }
+            else
+            {
+                CreateDiceRollString();
+                AddScore();
+                DisplayScreen();
+                cursorX = 4;
+                cursorY = 19;
+                SetCursor();
+                currentPlayer.GetPause();
+            }
+            killList = currentPlayer.BuildKillList();
             return (currentPlayer.score <= 0);
+        }
+        public void CreatePlayersLeft()
+        {
+            foreach (Player player in playerList)
+            {
+                playersLeft.Add(player);
+            }
+        }
+        public void CreateKillList()
+        {
+            killList = new List<List<int>>() { D4KillList, D6KillList, D8KillList, D10KillList, D12KillList, D20KillList };
+        }
+        public void ClearKillList()
+        {
+            D4KillList.Clear();
+            killList[0] = D4KillList;
+            D6KillList.Clear();
+            killList[1] = D6KillList;
+            D8KillList.Clear();
+            killList[2] = D8KillList;
+            D10KillList.Clear();
+            killList[3] = D10KillList;
+            D12KillList.Clear();
+            killList[4] = D12KillList;
+            D20KillList.Clear();
+            killList[5] = D20KillList;
+        }
+        public void GetCurrentPlayer()
+        {
+            if (playersLeft.Count == 0)
+            {
+                FindWinner();
+                ShowWinner();
+                playerDone = true;
+                gameOn = false;
+            }
+            else
+            {
+            currentPlayer = playersLeft[random.Next(0, playersLeft.Count - 1)];
+            }
         }
         public void FindWinner()
         {
             int highScore = 501;
             foreach (Player player in playerList)
             {
-                if (player.score < highScore)
+                if (player.score < highScore && !player.disqualified)
                 {
                     highScore = player.score;
                     winningPlayer = player;
+                    if (highScore < allTimeHighScore)
+                    {
+                        editFile.SaveNewHighScore(highScore);
+                    }
                 }
             }
         }
@@ -149,6 +183,7 @@ namespace DiceGame
                 {
                     if (roll == diceRollList[i])
                     {
+                        currentPlayer.disqualified = true;
                         return false;
                     }
                 }
@@ -200,20 +235,11 @@ namespace DiceGame
             cursorX = 4;
             cursorY = 20;
             SetCursor();
-            if (CheckPromptRoll())
+            if (currentPlayer.CheckPromptRoll())
             {
                 turnDone = true;
                 DisplayTurnOverScreen();
             }
-        }
-        public bool CheckPromptRoll()
-        {
-            string input = Console.ReadLine().ToLower();
-            if ( input== "done")
-            {
-                return true;
-            }
-            return false;
         }
         //Display Functions-------------------------------
         public void DisplayTurnOverScreen()
@@ -224,7 +250,8 @@ namespace DiceGame
             cursorX = 4;
             cursorY = 20;
             SetCursor();
-            Console.ReadLine();
+            ClearKillList();
+            currentPlayer.GetPause();
         }
         public void DrawScore()
         {
@@ -233,8 +260,16 @@ namespace DiceGame
                 cursorX = 4;
                 cursorY = 4 + (i * 2);
                 SetCursor();
-                Write(playerList[i].name + ": " + playerList[i].score);
-                BuildProgressBar(i);
+                if (playerList[i].disqualified)
+                {
+                    Write(playerList[i].name + ": ---");
+                }
+                else
+                {
+                    Write(playerList[i].name + ": " + playerList[i].score);
+                    BuildProgressBar(i);
+                }
+                
 
             }
         }
@@ -264,7 +299,7 @@ namespace DiceGame
             SetCursor();
             Write(winningPlayer.name + " is the winner!");
             Console.ReadLine();
-            gameOn = false;
+            playerTurnDone = false;
         }
         public void DisplayScreen()
         {

@@ -11,6 +11,11 @@ namespace DiceGame
     {
         Random random = new Random();
 
+        public int RollD2()
+        {
+            return random.Next(1, 2);
+        }
+
         public int RollD4()
         {
             return random.Next(1, 4);

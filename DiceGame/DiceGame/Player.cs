@@ -9,6 +9,7 @@ namespace DiceGame
     class Player
     {
         public string name;
+        public bool disqualified = false;
         public int score = 500;
         public Dice dice;
         public List<int> diceRollList;
@@ -61,6 +62,19 @@ namespace DiceGame
             }
             killList = new List<List<int>>() { D4KillList, D6KillList, D8KillList, D10KillList, D12KillList, D20KillList };
             return killList;
+        }
+        public virtual bool CheckPromptRoll()
+        {
+            string input = Console.ReadLine().ToLower();
+            if (input == "done")
+            {
+                return true;
+            }
+            return false;
+        }
+        public virtual void GetPause()
+        {
+            Console.ReadLine();
         }
     }
 }
